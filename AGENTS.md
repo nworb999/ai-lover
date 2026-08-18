@@ -14,4 +14,4 @@ This repo builds a persona-RLHF harness that rides on this very session. Dogfood
 - `events.jsonl` — append-only signal log (see `src/core.ts` for the envelope contract)
 - `src/core.ts` — hook-agnostic core; adapters call this
 - `.pi/extensions/feedback.ts` — pi adapter: every-turn feedback prompt
-- `src/rogue.ts` — experimental persona mutator; auto-applies, git-revertible
+- `src/daemon.ts` — THE system: resident daemon that owns bets, verdicts, reverts (ledger: `persona/hypotheses.jsonl`)

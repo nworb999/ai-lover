@@ -35,6 +35,7 @@
   <div class="panel"><h2>signal · what hurts / what lands</h2><div id="tags"></div></div>
   <div class="panel"><h2>per model · avg rating / turns</h2><div id="models"></div></div>
   <div class="panel"><h2>persona versions (click → diff)</h2><div id="versions"></div></div>
+  <div class="panel wide"><h2>daemon ledger · bets & verdicts</h2><div id="ledger"></div></div>
   <div class="panel wide"><h2>diff</h2><pre id="diff">select a version</pre></div>
 </div>
 <script>
@@ -42,8 +43,17 @@ const SPARK = "▁▂▃▄▅▆▇█";
 const BAD = ["cringe","sycophant","jargon","verbose","hedging","apologetic","lecturing","robotic","flat","hated-it"];
 const esc = s => s.replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";");
 
+async function showDiff(sha) {
+  const r = await fetch("/api/diff?sha=" + encodeURIComponent(sha));
+  const pre = document.getElementById("diff");
+  pre.textContent = r.ok ? await r.text() : "diff failed: " + r.status;
+  pre.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  pre.style.borderTop = "1px solid var(--hot)";
+  setTimeout(() => pre.style.borderTop = "", 800);
+}
+
 async function main() {
-  const { events, versions } = await (await fetch("/api/data")).json();
+  const { events, versions, ledger } = await (await fetch("/api/data")).json();
   const allFb = events.filter(e => e.kind === "feedback");
   const fb = allFb.filter(e => e.payload.rating);
 
@@ -87,15 +97,21 @@ async function main() {
     .map(([m,v]) => `<div class="row"><span class="k">${esc(m.split("/").pop())}</span>${(v.sum/v.n).toFixed(2)} avg · ${v.turns.size} turns</div>`)
     .join("") || "<span class='k'>none yet</span>";
 
+  // daemon ledger
+  document.getElementById("ledger").innerHTML = (ledger||[]).slice().reverse().map(b => {
+    const v = b.verdict;
+    const tag = !v ? `<span class="delta">open</span>`
+      : v.call === "keep" ? `<span style="color:var(--fg)">keep · ${v.reason}</span>`
+      : `<span class="rogue">reverted · ${v.reason}</span>`;
+    return `<div class="row ver" data-sha="${esc(b.commit)}"><span class="k">${esc(b.commit)}</span>${esc(b.hypothesis)} ${tag}</div>`;
+  }).join("") || "<span class='k'>no bets yet — daemon wakes on 3 fresh feedback events</span>";
   // versions — event delegation, no inline handlers
   document.getElementById("versions").innerHTML = versions.map(v =>
     `<div class="row ver ${v.rogue?"rogue":""}" data-sha="${esc(v.sha)}">
        <span class="k">${esc(v.sha)}</span>${esc(v.subject)}</div>`).join("");
-  document.getElementById("versions").addEventListener("click", async (ev) => {
+  document.body.addEventListener("click", (ev) => {
     const el = ev.target.closest("[data-sha]");
-    if (!el) return;
-    const r = await fetch("/api/diff?sha=" + encodeURIComponent(el.dataset.sha));
-    document.getElementById("diff").textContent = r.ok ? await r.text() : "diff failed: " + r.status;
+    if (el) showDiff(el.dataset.sha);
   });
 }
 main();

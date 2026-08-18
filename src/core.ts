@@ -46,7 +46,7 @@ export function personaSha(): string {
   }
 }
 
-export function appendEvent(e: Omit<LoverEvent, "ts" | "personaSha">): LoverEvent {
+export function appendEvent(e: Omit<LoverEvent, "ts" | "personaSha"> & { personaSha?: string }): LoverEvent {
   const full: LoverEvent = { ts: new Date().toISOString(), personaSha: personaSha(), ...e };
   appendFileSync(EVENTS, JSON.stringify(full) + "\n");
   return full;

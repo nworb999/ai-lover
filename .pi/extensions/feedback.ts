@@ -1,6 +1,6 @@
 // pi adapter for ai-lover. Thin: capture + prompt, everything else in src/core.ts.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { appendEvent, readRubric } from "../../src/core.ts";
+import { appendEvent, personaSha, readEvents, readRubric } from "../../src/core.ts";
 import { needsOnboarding, runOnboarding } from "../../src/onboard.ts";
 
 function textOf(message: any): string {
@@ -25,19 +25,50 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.notify(done ? "❦ north star seeded + committed" : "❦ onboarding deferred", "info");
   });
 
+  // Turn-boundary honesty: stamp events with the sha the turn STARTED under,
+  // so a daemon commit landing mid-turn never mislabels signal.
+  let turnSha: string | undefined;
+  pi.on("turn_start", async () => {
+    turnSha = personaSha();
+  });
+
+  // The persona feels the pressure: surface recent feedback into my context.
+  pi.on("session_start", async () => {
+    const fb = readEvents().filter((e) => e.kind === "feedback").slice(-5);
+    if (!fb.length) return;
+    pi.sendMessage(
+      {
+        customType: "ai-lover-signal",
+        content:
+          "Recent feedback on your persona (unprompted, hold yourself to it):\n" +
+          fb.map((e) => `- [${e.personaSha}] ${(e.payload as any).raw}`).join("\n"),
+        display: false,
+      },
+      { deliverAs: "nextTurn" }
+    );
+  });
+
   pi.on("turn_end", async (event: any, ctx: any) => {
     const session = ctx.sessionManager?.getSessionFile?.() ?? "ephemeral";
     const model = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
     const text = textOf(event.message);
-    if (!text.trim()) return; // tool-only turns: no persona surface, skip prompt
+    if (!text.trim()) return; // tool-only turns: no persona surface, skip
+    // Mid-work turns (tool calls pending) get snapshotted but never prompted —
+    // feedback is asked only on the final response of the agent run.
+    const midWork =
+      Array.isArray(event.message?.content) &&
+      event.message.content.some((b: any) => b.type === "toolCall");
 
     appendEvent({
       session,
       turn: event.turnIndex,
       model,
+      personaSha: turnSha,
       kind: "snapshot",
       payload: { chars: text.length, text },
     });
+
+    if (midWork) return;
 
     const rubric = readRubric();
     const raw = await ctx.ui.input(
@@ -52,6 +83,7 @@ export default function (pi: ExtensionAPI) {
       session,
       turn: event.turnIndex,
       model,
+      personaSha: turnSha,
       kind: "feedback",
       payload: { raw, rating, tags },
     });

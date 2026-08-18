@@ -4,7 +4,8 @@ import { createServer } from "node:http";
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ROOT, readEvents } from "./core.ts";
+import { ROOT, PERSONA_DIR, readEvents } from "./core.ts";
+import { existsSync } from "node:fs";
 
 const PORT = 4666;
 
@@ -34,11 +35,16 @@ const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://x");
   if (url.pathname === "/api/data") {
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify({ events: readEvents(), versions: personaLog() }));
+    const lp = join(PERSONA_DIR, "hypotheses.jsonl");
+    const ledger = existsSync(lp)
+      ? readFileSync(lp, "utf8").toString().split("\n").filter(Boolean).map((l) => JSON.parse(l))
+      : [];
+    res.end(JSON.stringify({ events: readEvents(), versions: personaLog(), ledger }));
   } else if (url.pathname === "/api/diff") {
     res.setHeader("content-type", "text/plain");
     res.end(personaDiff(url.searchParams.get("sha") ?? "HEAD"));
   } else {
+    res.setHeader("cache-control", "no-store");
     res.setHeader("content-type", "text/html");
     res.end(readFileSync(join(ROOT, "src", "dash.html")));
   }
