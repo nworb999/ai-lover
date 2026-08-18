@@ -107,7 +107,7 @@ Only these filenames: ${ALLOWED.join(", ")}.`;
   ledger2[ledger2.length - 1] = bet;
   writeLedger(ledger2); // sha correction stays uncommitted until the next bet; readers use the file
   appendEvent({ session: "daemon", kind: "daemon_bet", payload: { ...bet } });
-  console.log(`[daemon] bet ${commit}: ${hypothesis}`);
+  console.log(`[daemon] bet ${bet.commit}: ${hypothesis}`);
 }
 
 let busy = false;
