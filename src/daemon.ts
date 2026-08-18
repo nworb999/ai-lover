@@ -110,6 +110,21 @@ Only these filenames: ${ALLOWED.join(", ")}.`;
   console.log(`[daemon] bet ${bet.commit}: ${hypothesis}`);
 }
 
+// Single instance: pidfile lock. Ten daemons betting on the same signal is not
+// emergence, it's a fork bomb with a personality.
+const PIDFILE = "/tmp/ai-lover-daemon.pid";
+try {
+  const pid = Number(readFileSync(PIDFILE, "utf8"));
+  if (pid && !Number.isNaN(pid)) {
+    process.kill(pid, 0); // throws if not running
+    console.log(`[daemon] already running as pid ${pid}, exiting`);
+    process.exit(0);
+  }
+} catch {
+  /* stale or missing pidfile: we take over */
+}
+writeFileSync(PIDFILE, String(process.pid));
+
 let busy = false;
 function wake() {
   if (busy) return;

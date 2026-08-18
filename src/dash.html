@@ -11,7 +11,9 @@
   h1 { font-size:14px; font-weight:normal; letter-spacing:.2em; margin:0 0 20px; }
   h1 b { color:var(--hot); }
   .sub { color:var(--dim); }
-  .grid { display:grid; grid-template-columns: 1fr; gap:16px; max-width:760px; }
+  .grid { display:grid; grid-template-columns: minmax(0,760px) minmax(0,1fr); gap:16px; align-items:start; }
+  .left { display:grid; gap:16px; min-width:0; }
+  .right { position:sticky; top:24px; min-width:0; }
   .panel { background:var(--panel); border:1px solid var(--dim); padding:12px 14px; }
   .panel h2 { font-size:12px; font-weight:normal; color:var(--hot); margin:0 0 10px;
               text-transform:uppercase; letter-spacing:.15em; }
@@ -27,16 +29,20 @@
   .slip.expanded .full { display:block; }
   .quote { color:var(--fg); }
   .fight { border-left:2px solid var(--red); padding-left:10px; margin:8px 0; }
-  pre { color:var(--fg); white-space:pre-wrap; max-height:320px; overflow:auto;
+  pre { color:var(--fg); white-space:pre-wrap; max-height:calc(100vh - 120px); overflow:auto;
         border-top:1px dashed var(--dim); margin-top:8px; padding-top:8px; }
   svg text { fill:var(--dim); font:10px "IBM Plex Mono",monospace; }
 </style>
 <h1>ai-lover <b>✞</b> the courtship record</h1>
 <div class="grid">
-  <div class="panel"><h2>the pursuit</h2><div id="arc"></div><div id="arcmeta" class="sub"></div></div>
-  <div class="panel"><h2>what it thinks of you right now</h2><div id="state"></div></div>
-  <div class="panel"><h2>the daemon's record</h2><div id="ledger"></div></div>
-  <div class="panel"><h2>receipts</h2><pre id="diff">click a version band or a bet</pre></div>
+  <div class="left">
+    <div class="panel"><h2>the pursuit</h2><div id="arc"></div><div id="arcmeta" class="sub"></div></div>
+    <div class="panel"><h2>what it thinks of you right now</h2><div id="state"></div></div>
+    <div class="panel"><h2>the daemon's record</h2><div id="ledger"></div></div>
+  </div>
+  <div class="right">
+    <div class="panel"><h2>receipts</h2><pre id="diff">click a version band or a bet</pre></div>
+  </div>
 </div>
 <script>
 const esc = s => String(s).replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";");
@@ -45,7 +51,6 @@ async function showDiff(sha) {
   const r = await fetch("/api/diff?sha=" + encodeURIComponent(sha));
   const pre = document.getElementById("diff");
   pre.textContent = r.ok ? await r.text() : "diff failed: " + r.status;
-  pre.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 function arcSvg(fb, versions, ledger) {
