@@ -39,8 +39,12 @@ export interface LoverEvent {
 }
 
 export function personaSha(): string {
+  // The persona's version is the last commit touching persona/, NOT repo HEAD.
+  // Code commits must not move the sha that feedback joins against.
   try {
-    return execSync("git rev-parse --short HEAD", { cwd: ROOT }).toString().trim();
+    return execSync("git log -1 --format=%h -- persona ':!persona/hypotheses.jsonl'", { cwd: ROOT })
+      .toString()
+      .trim();
   } catch {
     return "unknown";
   }
