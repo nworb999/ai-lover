@@ -1,6 +1,7 @@
 // pi adapter for ai-lover. Thin: capture + prompt, everything else in src/core.ts.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { appendEvent, readRubric } from "../../src/core.ts";
+import { needsOnboarding, runOnboarding } from "../../src/onboard.ts";
 
 function textOf(message: any): string {
   const c = message?.content;
@@ -14,6 +15,16 @@ function textOf(message: any): string {
 }
 
 export default function (pi: ExtensionAPI) {
+  pi.on("session_start", async (_event: any, ctx: any) => {
+    if (!needsOnboarding()) return;
+    ctx.ui.notify("❦ ai-lover: north star unset — onboarding", "info");
+    const done = await runOnboarding(
+      (q) => ctx.ui.input(`❦ ${q}`, "empty = no strong opinion, esc = later"),
+      ctx.sessionManager?.getSessionFile?.() ?? "ephemeral"
+    );
+    ctx.ui.notify(done ? "❦ north star seeded + committed" : "❦ onboarding deferred", "info");
+  });
+
   pi.on("turn_end", async (event: any, ctx: any) => {
     const session = ctx.sessionManager?.getSessionFile?.() ?? "ephemeral";
     const model = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
