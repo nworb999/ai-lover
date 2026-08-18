@@ -31,7 +31,7 @@
 </style>
 <h1>ai-lover <b>✞</b> persona telemetry</h1>
 <div class="grid">
-  <div class="panel"><h2>rating over time</h2><div id="spark"></div><div id="sparkmeta" class="sub"></div></div>
+  <div class="panel"><h2>ratings by persona version</h2><div id="spark"></div><div id="sparkmeta" class="sub"></div></div>
   <div class="panel"><h2>signal · what hurts / what lands</h2><div id="tags"></div></div>
   <div class="panel"><h2>per model · avg rating / turns</h2><div id="models"></div></div>
   <div class="panel"><h2>persona versions (click → diff)</h2><div id="versions"></div></div>
@@ -57,14 +57,27 @@ async function main() {
   const allFb = events.filter(e => e.kind === "feedback");
   const fb = allFb.filter(e => e.payload.rating);
 
-  // rating sparkline, colored by persona sha boundaries
-  const shas = [...new Set(fb.map(e => e.personaSha))];
-  document.getElementById("spark").innerHTML = fb.map(e => {
-    const c = shas.indexOf(e.personaSha) % 2 ? "var(--hot)" : "var(--fg)";
-    return `<span style="color:${c}" title="${esc(e.personaSha + " t" + e.turn + ": " + e.payload.raw)}">${SPARK[Math.round((e.payload.rating-1)/4*7)]}</span>`;
+  // one lane per persona version, chronological: sha · each rating as a bar · avg
+  const lanes = [];
+  for (const e of fb) {
+    const last = lanes[lanes.length - 1];
+    if (last && last.sha === e.personaSha) last.fb.push(e);
+    else lanes.push({ sha: e.personaSha, fb: [e] });
+  }
+  const color = (r) => r >= 4 ? "var(--hot)" : r <= 2 ? "var(--red)" : "var(--fg)";
+  const verdictOf = (sha) => {
+    const b = (ledger || []).find((b) => b.commit === sha);
+    return !b ? "" : !b.verdict ? " · bet open" : " · bet " + b.verdict.call;
+  };
+  document.getElementById("spark").innerHTML = lanes.map(l => {
+    const a = (l.fb.reduce((s, e) => s + e.payload.rating, 0) / l.fb.length).toFixed(1);
+    const bars = l.fb.map(e =>
+      `<span style="color:${color(e.payload.rating)};font-size:16px" title="${esc("rated " + e.payload.rating + ": " + e.payload.raw)}">${SPARK[Math.round((e.payload.rating - 1) / 4 * 7)]}</span>`
+    ).join("");
+    return `<div class="row ver" data-sha="${esc(l.sha)}"><span class="k">${esc(l.sha)}</span>${bars}<span class="delta">avg ${a} · ${l.fb.length} rating${l.fb.length > 1 ? "s" : ""}${verdictOf(l.sha)}</span></div>`;
   }).join("") || "no rated feedback yet";
   document.getElementById("sparkmeta").textContent =
-    fb.length + " rated events · color alternates on persona version change · hover for the words";
+    "one lane per persona version, oldest first · bar height = your 1-5 rating · pink ≥4, red ≤2 · hover a bar for your words · click a lane for the diff";
 
   // tags: hurts vs lands, with recent-vs-overall trend (last 10 feedback events)
   const recent = allFb.slice(-10);
