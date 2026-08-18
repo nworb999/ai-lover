@@ -32,6 +32,8 @@
   .chip.revert { color:var(--red); border-color:var(--red); }
   .chip.open { color:var(--yellow); border-color:var(--yellow); }
   .slip { border-top:1px solid var(--line); padding:10px 0; }
+  .slip .lbl { color:var(--faint); display:inline-block; min-width:86px; font-size:12px; }
+  .slip .fieldrow { margin:2px 0; }
   .slip .full { display:none; color:var(--dim); margin-top:6px; white-space:pre-wrap; font-size:13px; }
   .slip.expanded .full { display:block; }
   .quote { color:var(--ink); }
@@ -39,6 +41,9 @@
   pre { color:var(--dim); white-space:pre-wrap; max-height:calc(100vh - 130px); overflow:auto;
         border-top:1px solid var(--line); margin-top:8px; padding-top:10px;
         font:12px/1.5 var(--mono); }
+  .d-add { color:#f0abfc; background:rgba(232,121,249,.08); }
+  .d-del { color:#7dd3fc; background:rgba(125,211,252,.07); }
+  .d-hunk, .d-meta { color:var(--faint); opacity:.7; }
   svg text { fill:var(--faint); font:10px var(--body); }
   circle.dot { cursor:pointer; transition:r .1s; }
   circle.dot:hover { r:6; stroke:var(--ink); stroke-width:1.5; }
@@ -47,7 +52,7 @@
 <h1>ai-lover <b>✞</b> persona telemetry <span class="glitter">✧ ⋆ ˚ ⊹</span></h1>
 <div class="grid">
   <div class="left">
-    <div class="panel"><h2>the pursuit</h2><div id="arc"></div><div id="arcmeta" class="sub"></div></div>
+    <div class="panel"><h2>the pursuit</h2><div id="arc"></div></div>
     <div class="panel"><h2>what it thinks of you right now</h2><div id="state"></div></div>
     <div class="panel"><h2>the daemon's record</h2><div id="ledger"></div></div>
   </div>
@@ -61,7 +66,15 @@ const esc = s => String(s).replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";"
 async function showDiff(sha) {
   const r = await fetch("/api/diff?sha=" + encodeURIComponent(sha));
   const pre = document.getElementById("diff");
-  pre.textContent = r.ok ? await r.text() : "diff failed: " + r.status;
+  if (!r.ok) { pre.textContent = "diff failed: " + r.status; return; }
+  pre.innerHTML = (await r.text()).split("\n").map(l => {
+    const e = esc(l);
+    if (l.startsWith("+++") || l.startsWith("---") || l.startsWith("diff --git") || l.startsWith("index ")) return `<span class="d-meta">${e}</span>`;
+    if (l.startsWith("+")) return `<span class="d-add">${e}</span>`;
+    if (l.startsWith("-")) return `<span class="d-del">${e}</span>`;
+    if (l.startsWith("@@")) return `<span class="d-hunk">${e}</span>`;
+    return e;
+  }).join("\n");
 }
 
 function arcSvg(fb, versions, ledger) {
@@ -110,9 +123,6 @@ async function main() {
   const fb = events.filter(e => e.kind === "feedback" && e.payload.rating);
 
   document.getElementById("arc").innerHTML = arcSvg(fb, versions, ledger);
-  document.getElementById("arcmeta").textContent =
-    "each dot = one of your ratings, in order · bands = persona versions · ✓ bet survived · ✗ reverted · ? on trial · hover a dot for your words, click anything for its diff";
-
   // open the latest version's receipt by default so the click affordance is obvious
   if (fb.length) showDiff(fb[fb.length - 1].personaSha);
 
@@ -126,20 +136,40 @@ async function main() {
     (s.runningTension ? `<div class="sub" style="margin-top:6px">tension: ${esc(s.runningTension)}</div>` : "") ||
     "<span class='sub'>it has no opinion of you yet</span>";
 
-  // daemon record: W-L header + betting slips
+  // daemon record: W-L header + betting slips, in plain words
   const bets = (ledger || []).slice().reverse();
   const w = bets.filter(b => b.verdict?.call === "keep").length;
   const l = bets.filter(b => b.verdict?.call === "revert").length;
   const open = bets.length - w - l;
+  const moveOf = (h) => {
+    const s = String(h).replace(/^\[[^\]]*\]\s*/, ""); // strip bookkeeping prefixes
+    const m = s.match(/Bet:\s*([^.]+\.)/);
+    return (m ? m[1] : s.split(".")[0] + ".").trim();
+  };
+  const verdictRow = (b) => {
+    if (b.verdict) {
+      const v = b.verdict;
+      return v.call === "keep"
+        ? `you averaged ${v.avg.toFixed(1)} under it vs ${v.baseline.toFixed(1)} before → it stayed`
+        : `you averaged ${v.avg.toFixed(1)} under it vs ${v.baseline.toFixed(1)} before → the daemon reverted it`;
+    }
+    const mine = fb.filter(e => e.personaSha === b.commit);
+    const a = mine.length ? (mine.reduce((s, e) => s + e.payload.rating, 0) / mine.length).toFixed(1) : null;
+    return `waiting on your ratings — has ${mine.length} of 3${a ? `, running avg ${a}` : ""}`;
+  };
   const chip = b => !b.verdict ? `<span class="chip open">on trial</span>`
-    : b.verdict.call === "keep" ? `<span class="chip keep">survived · ${esc(b.verdict.reason)}</span>`
-    : `<span class="chip revert">reverted · ${esc(b.verdict.reason)}</span>`;
+    : b.verdict.call === "keep" ? `<span class="chip keep">survived</span>`
+    : `<span class="chip revert">reverted</span>`;
   document.getElementById("ledger").innerHTML =
-    `<div style="margin-bottom:8px">record: ${w}–${l}${open ? ` · ${open} on trial` : ""}</div>` +
-    bets.map(b => `<div class="slip" data-slip>
-       <span class="ver mono" data-sha="${esc(b.commit)}">${esc(b.commit)}</span> ·
-       ${esc(String(b.hypothesis).split(/(?<=\.)\s/).slice(-2, -1)[0] || String(b.hypothesis).split(".")[0])}
-       <span class="sub">· predicts ${esc(b.predicted || "?")}</span>${chip(b)}
+    `<div style="margin-bottom:8px">the daemon changes the persona by placing bets; your ratings decide if they live.
+       record: <b>${w} kept · ${l} reverted${open ? ` · ${open} on trial` : ""}</b></div>` +
+    bets.map((b, i) => `<div class="slip" data-slip>
+       <div><b>bet #${bets.length - i}</b>${chip(b)}
+         <span class="sub" style="float:right"><span class="ver mono" data-sha="${esc(b.commit)}">${esc(b.commit)}</span> · view diff</span></div>
+       <div class="fieldrow"><span class="lbl">the move</span>${esc(moveOf(b.hypothesis))}</div>
+       <div class="fieldrow"><span class="lbl">hoping for</span><span class="sub">${esc(b.predicted || "?")}</span></div>
+       <div class="fieldrow"><span class="lbl">verdict</span>${verdictRow(b)}</div>
+       <div class="fieldrow sub" style="cursor:pointer">› full reasoning</div>
        <div class="full">${esc(b.hypothesis)}</div></div>`).join("") ||
     "<span class='sub'>no bets yet — the daemon wakes on 3 fresh feedback events</span>";
 
