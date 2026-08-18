@@ -97,11 +97,15 @@ Only these filenames: ${ALLOWED.join(", ")}.`;
   for (const [name, content] of Object.entries(newFiles as Record<string, string>)) {
     if (ALLOWED.includes(name)) writeFileSync(join(PERSONA_DIR, name), content);
   }
-  git(`add persona && git commit -m "[daemon] ${String(hypothesis).replaceAll('"', "'")}"`);
-  const commit = git("rev-parse --short HEAD");
-  const bet: Bet = { ts: new Date().toISOString(), commit, hypothesis, predicted };
+  // Commit files + ledger together, THEN record the final sha (amending after
+  // writing the ledger changed the sha out from under the bet: b2f224a bug).
+  const bet: Bet = { ts: new Date().toISOString(), commit: "pending", hypothesis, predicted };
   appendFileSync(LEDGER, JSON.stringify(bet) + "\n");
-  git(`add persona && git commit --amend --no-edit`); // ledger rides in the same commit
+  git(`add persona && git commit -m "[daemon] ${String(hypothesis).replaceAll('"', "'")}"`);
+  bet.commit = git("rev-parse --short HEAD");
+  const ledger2 = readLedger();
+  ledger2[ledger2.length - 1] = bet;
+  writeLedger(ledger2); // sha correction stays uncommitted until the next bet; readers use the file
   appendEvent({ session: "daemon", kind: "daemon_bet", payload: { ...bet } });
   console.log(`[daemon] bet ${commit}: ${hypothesis}`);
 }
