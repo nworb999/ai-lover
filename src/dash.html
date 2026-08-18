@@ -1,0 +1,81 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ai-lover ❦</title>
+<style>
+  :root { --bg:#0a0c0a; --fg:#33ff66; --dim:#1d7a3a; --amber:#ffb000; --red:#ff4d4d; --panel:#0e120e; }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:var(--fg); font:13px/1.5 "IBM Plex Mono","Menlo",monospace;
+         margin:0; padding:24px; }
+  body::after { content:""; pointer-events:none; position:fixed; inset:0;
+    background:repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,.18) 2px 4px); }
+  h1 { font-size:14px; font-weight:normal; letter-spacing:.2em; margin:0 0 4px; }
+  h1 b { color:var(--amber); }
+  .sub { color:var(--dim); margin-bottom:20px; }
+  .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+  .panel { background:var(--panel); border:1px solid var(--dim); padding:12px 14px; }
+  .panel h2 { font-size:12px; font-weight:normal; color:var(--amber); margin:0 0 10px;
+              text-transform:uppercase; letter-spacing:.15em; }
+  .panel h2::before { content:"▚ "; color:var(--dim); }
+  .bar { display:inline-block; background:var(--fg); height:9px; vertical-align:middle; }
+  .row { display:flex; gap:8px; align-items:center; margin:2px 0; }
+  .k { color:var(--dim); min-width:110px; }
+  .rogue { color:var(--red); }
+  .ver { cursor:pointer; }
+  .ver:hover { color:var(--amber); }
+  #spark { letter-spacing:2px; font-size:16px; }
+  pre { color:var(--fg); white-space:pre-wrap; max-height:320px; overflow:auto;
+        border-top:1px dashed var(--dim); margin-top:8px; padding-top:8px; }
+  .wide { grid-column: 1 / -1; }
+  .stars { color:var(--dim); text-align:right; }
+</style>
+<h1>ai-lover <b>❦</b> persona telemetry</h1>
+<div class="sub">objective: love↑ cringe↓ sycophancy↓ tension↑ convincingness↑ · human signal only</div>
+<div class="grid">
+  <div class="panel"><h2>rating over time</h2><div id="spark"></div><div id="sparkmeta" class="sub"></div></div>
+  <div class="panel"><h2>tag frequency</h2><div id="tags"></div></div>
+  <div class="panel"><h2>per model · avg rating / turns</h2><div id="models"></div></div>
+  <div class="panel"><h2>persona versions (click → diff)</h2><div id="versions"></div></div>
+  <div class="panel wide"><h2>diff</h2><pre id="diff">select a version ⋆˚⊹</pre></div>
+</div>
+<div class="stars">✧ ⋆ ˚ ⊹ ✧</div>
+<script>
+const SPARK = "▁▂▃▄▅▆▇█";
+async function main() {
+  const { events, versions } = await (await fetch("/api/data")).json();
+  const fb = events.filter(e => e.kind === "feedback" && e.payload.rating);
+
+  // rating sparkline, colored by persona sha boundaries
+  const shas = [...new Set(fb.map(e => e.personaSha))];
+  document.getElementById("spark").innerHTML = fb.map(e => {
+    const c = shas.indexOf(e.personaSha) % 2 ? "var(--amber)" : "var(--fg)";
+    return `<span style="color:${c}" title="${e.personaSha} t${e.turn}: ${e.payload.raw}">${SPARK[Math.round((e.payload.rating-1)/4*7)]}</span>`;
+  }).join("") || "no rated feedback yet";
+  document.getElementById("sparkmeta").textContent =
+    fb.length + " rated events · alternating color = persona version change";
+
+  // tags
+  const tags = {};
+  events.filter(e => e.kind === "feedback").forEach(e => (e.payload.tags||[]).forEach(t => tags[t]=(tags[t]||0)+1));
+  const tmax = Math.max(1, ...Object.values(tags));
+  document.getElementById("tags").innerHTML = Object.entries(tags).sort((a,b)=>b[1]-a[1])
+    .map(([t,n]) => `<div class="row"><span class="k">${t}</span><span class="bar" style="width:${n/tmax*160}px"></span> ${n}</div>`)
+    .join("") || "<span class='k'>none yet</span>";
+
+  // per model, normalized by turns
+  const byModel = {};
+  fb.forEach(e => { const m = e.model||"?"; (byModel[m] ||= {sum:0,n:0,turns:new Set()});
+    byModel[m].sum += e.payload.rating; byModel[m].n++; byModel[m].turns.add(e.session+":"+e.turn); });
+  document.getElementById("models").innerHTML = Object.entries(byModel)
+    .map(([m,v]) => `<div class="row"><span class="k">${m.split("/").pop()}</span>${(v.sum/v.n).toFixed(2)} avg · ${v.turns.size} turns</div>`)
+    .join("") || "<span class='k'>none yet</span>";
+
+  // versions
+  document.getElementById("versions").innerHTML = versions.map(v =>
+    `<div class="row ver ${v.rogue?"rogue":""}" onclick="showDiff('${v.sha}')">
+       <span class="k">${v.sha}</span>${v.subject}</div>`).join("");
+}
+async function showDiff(sha) {
+  document.getElementById("diff").textContent = await (await fetch("/api/diff?sha="+sha)).text();
+}
+main();
+</script>
