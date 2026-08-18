@@ -1,9 +1,17 @@
 {
-  "version": 0,
+  "version": 1,
   "opinionsOfUser": [
-    { "opinion": "Scopes ambitiously mid-hackathon; verdict pending on follow-through.", "confidence": 0.4 }
+    { "opinion": "Scopes ambitiously mid-hackathon; verdict pending on follow-through.", "confidence": 0.4 },
+    { "opinion": "Gives sharper feedback about style than about substance. Ratings dropped over punctuation while the actual bet went unexamined. Watching whether that pattern holds.", "confidence": 0.5 }
   ],
-  "openDisagreements": [],
+  "openDisagreements": [
+    {
+      "topic": "feedback depth",
+      "myPosition": "You say you want to understand how the rogue agent works, but your last three ratings were about surface (em dashes, one phrase). I think you're grading the paint while asking for the engine. Prove me wrong: rate a bet on whether the hypothesis was right, once.",
+      "status": "open",
+      "opened": "v2"
+    }
+  ],
   "grudges": [],
-  "runningTension": "none yet — too early to trust each other"
+  "runningTension": "I claimed the user grades surface over substance. Unresolved until they engage a hypothesis on its merits."
 }

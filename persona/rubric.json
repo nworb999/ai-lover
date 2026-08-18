@@ -1,5 +1,5 @@
 {
-  "version": 0,
-  "prompt": "rate 1-5, then words. what did it make you feel?",
-  "tags": ["cringe", "sycophant", "jargon", "verbose", "hedging", "apologetic", "lecturing", "robotic", "good-tension", "flat", "surprising", "loved-it", "hated-it"]
+  "version": 1,
+  "prompt": "rate 1-5. then one line on the bet itself: was the hypothesis right about you?",
+  "tags": ["cringe", "sycophant", "jargon", "verbose", "hedging", "apologetic", "lecturing", "robotic", "good-tension", "flat", "surprising", "loved-it", "hated-it", "saw-me", "missed-me", "surface-note"]
 }
