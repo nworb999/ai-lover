@@ -31,7 +31,7 @@
 </style>
 <h1>ai-lover <b>✞</b> persona telemetry</h1>
 <div class="grid">
-  <div class="panel"><h2>ratings by persona version</h2><div id="spark"></div><div id="sparkmeta" class="sub"></div></div>
+  <div class="panel"><h2>the story so far</h2><div id="spark"></div><div id="sparkmeta" class="sub"></div></div>
   <div class="panel"><h2>daemon ledger · bets & verdicts</h2><div id="ledger"></div></div>
   <div class="panel"><h2>diff</h2><pre id="diff">click a lane or a bet</pre></div>
 </div>
@@ -54,27 +54,34 @@ async function main() {
   const allFb = events.filter(e => e.kind === "feedback");
   const fb = allFb.filter(e => e.payload.rating);
 
-  // one lane per persona version, chronological: sha · each rating as a bar · avg
+  // one row per persona version, in order, in words
   const lanes = [];
   for (const e of fb) {
     const last = lanes[lanes.length - 1];
     if (last && last.sha === e.personaSha) last.fb.push(e);
     else lanes.push({ sha: e.personaSha, fb: [e] });
   }
+  const subjectOf = (sha) => (versions.find((v) => v.sha === sha)?.subject ?? "");
   const color = (r) => r >= 4 ? "var(--hot)" : r <= 2 ? "var(--red)" : "var(--fg)";
-  const verdictOf = (sha) => {
-    const b = (ledger || []).find((b) => b.commit === sha);
-    return !b ? "" : !b.verdict ? " · bet open" : " · bet " + b.verdict.call;
-  };
-  document.getElementById("spark").innerHTML = lanes.map(l => {
-    const a = (l.fb.reduce((s, e) => s + e.payload.rating, 0) / l.fb.length).toFixed(1);
-    const bars = l.fb.map(e =>
-      `<span style="color:${color(e.payload.rating)};font-size:16px" title="${esc("rated " + e.payload.rating + ": " + e.payload.raw)}">${SPARK[Math.round((e.payload.rating - 1) / 4 * 7)]}</span>`
-    ).join("");
-    return `<div class="row ver" data-sha="${esc(l.sha)}"><span class="k">${esc(l.sha)}</span>${bars}<span class="delta">avg ${a} · ${l.fb.length} rating${l.fb.length > 1 ? "s" : ""}${verdictOf(l.sha)}</span></div>`;
+  let prevAvg = null;
+  document.getElementById("spark").innerHTML = lanes.map((l, i) => {
+    const avg = l.fb.reduce((s, e) => s + e.payload.rating, 0) / l.fb.length;
+    const subj = subjectOf(l.sha);
+    const daemon = subj.startsWith("[daemon]");
+    const label = daemon ? `daemon's bet: “${subj.replace("[daemon] ", "").split(".")[0]}”` : (subj || "persona " + l.sha);
+    const scores = l.fb.map(e =>
+      `<span style="color:${color(e.payload.rating)}" title="${esc(e.payload.raw)}">${e.payload.rating}</span>`).join(" ");
+    const trend = prevAvg === null ? "" : avg > prevAvg ? ` · up from ${prevAvg.toFixed(1)}` : avg < prevAvg ? ` · down from ${prevAvg.toFixed(1)}` : " · flat";
+    const b = (ledger || []).find((b) => b.commit === l.sha);
+    const verdict = !b ? "" : !b.verdict ? " · still on trial" : b.verdict.call === "keep" ? " · survived" : " · reverted";
+    prevAvg = avg;
+    return `<div class="ver" data-sha="${esc(l.sha)}" style="margin:10px 0">
+      <div>v${i + 1} · ${esc(label).slice(0, 110)}</div>
+      <div class="sub">you rated it ${scores}<span class="sub"> → avg ${avg.toFixed(1)}${trend}${verdict}</span></div>
+    </div>`;
   }).join("") || "no rated feedback yet";
   document.getElementById("sparkmeta").textContent =
-    "one lane per persona version, oldest first · bar height = your 1-5 rating · pink ≥4, red ≤2 · hover a bar for your words · click a lane for the diff";
+    "hover a number for what you said · click a version for its diff";
 
   // daemon ledger
   document.getElementById("ledger").innerHTML = (ledger||[]).slice().reverse().map(b => {
