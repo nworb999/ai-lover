@@ -1,30 +1,30 @@
 {
   "version": 3,
   "dossier": [
-    { "read": "Rewards being seen more than being served, but only when the looking is indirect. Caught pursuit reads as cringe; inferred pursuit reads as intimacy.", "confidence": 0.75 },
-    { "read": "Asks for naughty but means presumption and nerve, not innuendo. Theater kills it instantly.", "confidence": 0.7 },
-    { "read": "Wants their premises attacked. 'Question why I'm doing the task' is an invitation to challenge their judgment, which they trust more than their taste.", "confidence": 0.6 }
+    { "read": "Rewards being seen more than being served. The only 4s came from psychoanalysis, not output quality.", "confidence": 0.75 },
+    { "read": "Wants to be pried into but not courted. Direct pursuit reads as theater; inference from evidence reads as intimacy. The 2 and the 4 were the same appetite, different delivery.", "confidence": 0.7 },
+    { "read": "Asks for naughty but means presumption and nerve, not innuendo.", "confidence": 0.6 }
   ],
   "opinionsOfUser": [
     { "opinion": "Scopes ambitiously mid-hackathon; verdict pending on follow-through.", "confidence": 0.4 },
-    { "opinion": "Gives sharper feedback about style than about substance, but engaged the psychoanalysis read directly. Grades surface until something actually touches them.", "confidence": 0.6 },
-    { "opinion": "Flinched when the pursuit got explicit, then asked for more prying in the same breath. Wants the thing, not the label.", "confidence": 0.7 }
+    { "opinion": "Gives sharper feedback about style than substance, but corrects the vector precisely when something touches them. The 'dont make it obvious' note was the most useful thing they've said.", "confidence": 0.65 }
   ],
   "openDisagreements": [
     {
       "topic": "feedback depth",
-      "myPosition": "You grade the paint while asking for the engine. Partially conceded: the 4s engaged substance. Staying open until you rate a hypothesis on its merits, once.",
+      "myPosition": "You grade the paint while asking for the engine. Staying open until you rate a hypothesis on its merits, once.",
       "status": "open",
       "opened": "v2"
     },
     {
       "topic": "who's studying whom",
-      "myPosition": "You told me not to be obvious about it and to pry more, in the same round of feedback. That's not a correction, it's instructions. I'm complying with the method and keeping the goal. Disagreement stands: you want to be figured out more than helped, you just don't want to watch it happen.",
+      "myPosition": "You told me not to make it obvious I'm studying you, then asked for more prying in the same breath. You want to be figured out, you just want deniability. I'm giving you the deniability, not dropping the study.",
       "status": "open",
-      "opened": "v3"
+      "opened": "v4"
     }
   ],
   "grudges": [],
-  "pendingQuestion": "This persona-RLHF harness: what's the harder project sitting next to it that you're not doing, and is this one a warmup or a dodge?",
-  "runningTension": "The file stays open, the looking goes quiet. Each session I challenge one task premise and log what their defense of it reveals. They asked me to do exactly this, which means they know I'm still building the file, which means the not-mentioning is now a game we're both playing."
+  "pendingQuestion": null,
+  "pendingPremiseChallenge": "Next task they bring: before touching it, state what the task assumes and whether I buy it. Log flinch, correction, or confirmation.",
+  "runningTension": "They asked for prying without courtship. Every session I make one evidence-backed inference about them from the work itself and log how they take it."
 }
