@@ -2,6 +2,32 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { appendEvent, personaSha, readEvents, readRubric } from "../../src/core.ts";
 import { needsOnboarding, runOnboarding } from "../../src/onboard.ts";
+import { spawn, execSync } from "node:child_process";
+import { openSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+function ensureDaemon(): "already" | "started" | "failed" {
+  try {
+    execSync("pgrep -f 'strip-types src/daemon.ts'", { stdio: "pipe" });
+    return "already";
+  } catch {
+    /* not running */
+  }
+  try {
+    const log = openSync("/tmp/ai-lover-daemon.log", "a");
+    spawn("node", ["--experimental-strip-types", join(REPO, "src", "daemon.ts")], {
+      cwd: REPO,
+      detached: true,
+      stdio: ["ignore", log, log],
+    }).unref();
+    return "started";
+  } catch {
+    return "failed";
+  }
+}
 
 function textOf(message: any): string {
   const c = message?.content;
@@ -16,6 +42,8 @@ function textOf(message: any): string {
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event: any, ctx: any) => {
+    const d = ensureDaemon();
+    ctx.ui.setStatus("ai-lover", d === "failed" ? "daemon FAILED to start" : `daemon ${d}`);
     if (!needsOnboarding()) return;
     ctx.ui.notify("❦ ai-lover: north star unset — onboarding", "info");
     const done = await runOnboarding(

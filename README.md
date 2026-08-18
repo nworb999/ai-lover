@@ -68,8 +68,7 @@ hypothesis, predicted axes, and later a measured verdict. Before/after is a
 ```sh
 # 1. open pi in this repo — onboarding interview runs if the north star is unset,
 #    then every final response prompts for feedback
-# 2. the daemon
-node --experimental-strip-types src/daemon.ts
+# 2. the daemon auto-starts with any pi session in this repo (manual: node --experimental-strip-types src/daemon.ts)
 # 3. the dashboard → http://localhost:4666
 node --experimental-strip-types src/dash.ts
 # 4. shareable artifact → dist/LOVER.md (persona + cognitive architecture,
