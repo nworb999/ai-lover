@@ -1,21 +1,22 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>ai-lover · courtship record</title>
+<title>ai-lover ✞</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:#17171a; --panel:#1e1e22; --mass:#26262b; --line:#26262b; --line2:#35353d;
-    --ink:#eae8ee; --dim:#b0afb6; --faint:#908f96;
-    --spot:#cba6f7; --red:#f38ba8; --yellow:#f9e2af; --teal:#94e2d5;
-    /* aliases used by inline JS */ --fg:var(--ink); --hot:var(--teal);
+    --bg:#0b0910; --panel:#120e1a; --mass:#1a1424; --line:#241a33; --line2:#3b2a55;
+    --ink:#e9dcff; --dim:#a78bda; --faint:#7c5fb0;
+    --spot:#c084fc; --red:#ff4d6d; --yellow:#f9e2af; --teal:#e879f9; --hotpink:#e879f9;
+    /* aliases used by inline JS */ --fg:var(--spot); --hot:var(--hotpink);
     --disp:"Archivo",system-ui,sans-serif; --body:"Inter",system-ui,sans-serif;
     --mono:"SF Mono","Menlo",monospace;
   }
   * { box-sizing:border-box; }
   body { background:var(--bg); color:var(--ink); font:14px/1.55 var(--body); margin:0; padding:28px; }
-  h1 { font:800 22px/1 var(--disp); letter-spacing:-.045em; margin:0 0 22px; }
-  h1 b { color:var(--spot); }
+  h1 { font:800 22px/1 var(--disp); letter-spacing:-.045em; margin:0 0 22px; color:var(--spot); }
+  h1 b { color:var(--hotpink); }
+  h1 .glitter { color:var(--faint); font-weight:600; font-size:14px; letter-spacing:.1em; }
   .sub { color:var(--faint); font-size:12.5px; }
   .grid { display:grid; grid-template-columns: minmax(0,760px) minmax(0,1fr); gap:14px; align-items:start; }
   .left { display:grid; gap:14px; min-width:0; }
@@ -27,7 +28,7 @@
   .ver:hover { color:var(--spot); }
   .mono { font-family:var(--mono); font-size:12px; }
   .chip { border:1px solid var(--line2); padding:1px 7px; margin-left:8px; font-size:12px; }
-  .chip.keep { color:var(--teal); border-color:var(--teal); }
+  .chip.keep { color:var(--spot); border-color:var(--spot); }
   .chip.revert { color:var(--red); border-color:var(--red); }
   .chip.open { color:var(--yellow); border-color:var(--yellow); }
   .slip { border-top:1px solid var(--line); padding:10px 0; }
@@ -39,8 +40,11 @@
         border-top:1px solid var(--line); margin-top:8px; padding-top:10px;
         font:12px/1.5 var(--mono); }
   svg text { fill:var(--faint); font:10px var(--body); }
+  circle.dot { cursor:pointer; transition:r .1s; }
+  circle.dot:hover { r:6; stroke:var(--ink); stroke-width:1.5; }
+  circle.dot.latest { stroke:var(--hotpink); stroke-width:1.5; }
 </style>
-<h1>ai-lover<b>.</b> courtship record</h1>
+<h1>ai-lover <b>✞</b> persona telemetry <span class="glitter">✧ ⋆ ˚ ⊹</span></h1>
 <div class="grid">
   <div class="left">
     <div class="panel"><h2>the pursuit</h2><div id="arc"></div><div id="arcmeta" class="sub"></div></div>
@@ -87,9 +91,10 @@ function arcSvg(fb, versions, ledger) {
 
   const pts = fb.map((e, i) => `${x(i)},${y(e.payload.rating)}`).join(" ");
   const dots = fb.map((e, i) =>
-    `<circle cx="${x(i)}" cy="${y(e.payload.rating)}" r="3.5"
+    `<circle class="dot ver ${i === n - 1 ? "latest" : ""}" data-sha="${esc(e.personaSha)}"
+       cx="${x(i)}" cy="${y(e.payload.rating)}" r="3.5"
        fill="${e.payload.rating >= 4 ? "var(--hot)" : e.payload.rating <= 2 ? "var(--red)" : "var(--fg)"}">
-       <title>${esc("rated " + e.payload.rating + ": " + e.payload.raw)}</title></circle>`).join("");
+       <title>${esc("rated " + e.payload.rating + ": " + e.payload.raw + " · click for this version's diff")}</title></circle>`).join("");
   const gridlines = [1,2,3,4,5].map(r =>
     `<line x1="${PAD}" x2="${W-PAD}" y1="${y(r)}" y2="${y(r)}" stroke="var(--line2)"/>
      <text x="6" y="${y(r)+3}">${r}</text>`).join("");
@@ -106,7 +111,10 @@ async function main() {
 
   document.getElementById("arc").innerHTML = arcSvg(fb, versions, ledger);
   document.getElementById("arcmeta").textContent =
-    "each dot = one of your ratings, in order · bands = persona versions · ✓ bet survived · ✗ reverted · ? on trial · hover dots, click bands";
+    "each dot = one of your ratings, in order · bands = persona versions · ✓ bet survived · ✗ reverted · ? on trial · hover a dot for your words, click anything for its diff";
+
+  // open the latest version's receipt by default so the click affordance is obvious
+  if (fb.length) showDiff(fb[fb.length - 1].personaSha);
 
   // relationship state
   const s = state || {};
