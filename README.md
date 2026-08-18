@@ -1,8 +1,10 @@
 # ai-lover ✞
 
 A persona-RLHF harness that rides on your coding agent while you work.
-Goal: fall in love with your coding agent. Built and dogfooded in the same
-session, at a hackathon, by the agent being improved.
+
+**Goal**: fall in love with your coding agent. 
+
+Built and dogfooded in the same session, at a hackathon, by the agent being improved.
 
 ## The problem
 
