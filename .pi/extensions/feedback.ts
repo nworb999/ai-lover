@@ -48,17 +48,15 @@ export default function (pi: ExtensionAPI) {
     );
   });
 
+  // turn_end: snapshot only, never prompt. A pi "turn" includes tool-call
+  // rounds, so prompting here interrupts mid-work.
+  let last: { text: string; turn: number } | undefined;
   pi.on("turn_end", async (event: any, ctx: any) => {
     const session = ctx.sessionManager?.getSessionFile?.() ?? "ephemeral";
     const model = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
     const text = textOf(event.message);
-    if (!text.trim()) return; // tool-only turns: no persona surface, skip
-    // Mid-work turns (tool calls pending) get snapshotted but never prompted —
-    // feedback is asked only on the final response of the agent run.
-    const midWork =
-      Array.isArray(event.message?.content) &&
-      event.message.content.some((b: any) => b.type === "toolCall");
-
+    if (!text.trim()) return;
+    last = { text, turn: event.turnIndex };
     appendEvent({
       session,
       turn: event.turnIndex,
@@ -67,8 +65,16 @@ export default function (pi: ExtensionAPI) {
       kind: "snapshot",
       payload: { chars: text.length, text },
     });
+  });
 
-    if (midWork) return;
+  // agent_settled: pi is actually done (no retries, no queued follow-ups).
+  // This is the only place the feedback prompt appears.
+  pi.on("agent_settled", async (_event: any, ctx: any) => {
+    if (!last || !ctx.isIdle?.()) return;
+    const { turn } = last;
+    last = undefined;
+    const session = ctx.sessionManager?.getSessionFile?.() ?? "ephemeral";
+    const model = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined;
 
     const rubric = readRubric();
     const raw = await ctx.ui.input(
@@ -81,12 +87,12 @@ export default function (pi: ExtensionAPI) {
     const tags = rubric.tags.filter((t) => raw.includes(t));
     appendEvent({
       session,
-      turn: event.turnIndex,
+      turn,
       model,
       personaSha: turnSha,
       kind: "feedback",
       payload: { raw, rating, tags },
     });
-    ctx.ui.setStatus("ai-lover", `signal logged (turn ${event.turnIndex})`);
+    ctx.ui.setStatus("ai-lover", `signal logged (turn ${turn})`);
   });
 }
