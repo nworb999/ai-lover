@@ -39,7 +39,11 @@ const server = createServer((req, res) => {
     const ledger = existsSync(lp)
       ? readFileSync(lp, "utf8").toString().split("\n").filter(Boolean).map((l) => JSON.parse(l))
       : [];
-    res.end(JSON.stringify({ events: readEvents(), versions: personaLog(), ledger }));
+    let state = {};
+    try {
+      state = JSON.parse(readFileSync(join(PERSONA_DIR, "state.json"), "utf8"));
+    } catch {}
+    res.end(JSON.stringify({ events: readEvents(), versions: personaLog(), ledger, state }));
   } else if (url.pathname === "/api/diff") {
     res.setHeader("content-type", "text/plain");
     res.end(personaDiff(url.searchParams.get("sha") ?? "HEAD"));

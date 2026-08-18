@@ -16,84 +16,118 @@
   .panel h2 { font-size:12px; font-weight:normal; color:var(--hot); margin:0 0 10px;
               text-transform:uppercase; letter-spacing:.15em; }
   .panel h2::before { content:"▚ "; color:var(--dim); }
-  .bar { display:inline-block; background:var(--fg); height:9px; vertical-align:middle; }
-  .bad .bar { background:var(--red); }
-  .row { display:flex; gap:8px; align-items:center; margin:2px 0; }
-  .k { color:var(--dim); min-width:110px; }
-  .delta { color:var(--hot); margin-left:6px; }
-  .rogue { color:var(--red); }
   .ver { cursor:pointer; }
   .ver:hover { color:var(--hot); }
-  #spark { letter-spacing:2px; font-size:16px; }
+  .chip { border:1px solid var(--dim); padding:0 6px; margin-left:8px; }
+  .chip.keep { color:var(--fg); border-color:var(--fg); }
+  .chip.revert { color:var(--red); border-color:var(--red); }
+  .chip.open { color:var(--hot); border-color:var(--hot); }
+  .slip { border-top:1px dashed var(--dim); padding:8px 0; }
+  .slip .full { display:none; color:var(--dim); margin-top:6px; white-space:pre-wrap; }
+  .slip.expanded .full { display:block; }
+  .quote { color:var(--fg); }
+  .fight { border-left:2px solid var(--red); padding-left:10px; margin:8px 0; }
   pre { color:var(--fg); white-space:pre-wrap; max-height:320px; overflow:auto;
         border-top:1px dashed var(--dim); margin-top:8px; padding-top:8px; }
-  .wide { grid-column: 1 / -1; }
+  svg text { fill:var(--dim); font:10px "IBM Plex Mono",monospace; }
 </style>
-<h1>ai-lover <b>✞</b> persona telemetry</h1>
+<h1>ai-lover <b>✞</b> the courtship record</h1>
 <div class="grid">
-  <div class="panel"><h2>the story so far</h2><div id="spark"></div><div id="sparkmeta" class="sub"></div></div>
-  <div class="panel"><h2>daemon ledger · bets & verdicts</h2><div id="ledger"></div></div>
-  <div class="panel"><h2>diff</h2><pre id="diff">click a lane or a bet</pre></div>
+  <div class="panel"><h2>the pursuit</h2><div id="arc"></div><div id="arcmeta" class="sub"></div></div>
+  <div class="panel"><h2>what it thinks of you right now</h2><div id="state"></div></div>
+  <div class="panel"><h2>the daemon's record</h2><div id="ledger"></div></div>
+  <div class="panel"><h2>receipts</h2><pre id="diff">click a version band or a bet</pre></div>
 </div>
 <script>
-const SPARK = "▁▂▃▄▅▆▇█";
-const BAD = ["cringe","sycophant","jargon","verbose","hedging","apologetic","lecturing","robotic","flat","hated-it"];
-const esc = s => s.replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";");
+const esc = s => String(s).replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";");
 
 async function showDiff(sha) {
   const r = await fetch("/api/diff?sha=" + encodeURIComponent(sha));
   const pre = document.getElementById("diff");
   pre.textContent = r.ok ? await r.text() : "diff failed: " + r.status;
   pre.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  pre.style.borderTop = "1px solid var(--hot)";
-  setTimeout(() => pre.style.borderTop = "", 800);
+}
+
+function arcSvg(fb, versions, ledger) {
+  const W = 700, H = 180, PAD = 24;
+  const n = fb.length;
+  if (!n) return "no rated feedback yet";
+  const x = i => PAD + (n === 1 ? (W - 2 * PAD) / 2 : i * (W - 2 * PAD) / (n - 1));
+  const y = r => H - PAD - (r - 1) * (H - 2 * PAD) / 4;
+
+  // epochs: consecutive runs of the same persona sha
+  const epochs = [];
+  fb.forEach((e, i) => {
+    const last = epochs[epochs.length - 1];
+    if (last && last.sha === e.personaSha) last.end = i;
+    else epochs.push({ sha: e.personaSha, start: i, end: i });
+  });
+  const bandColor = i => i % 2 ? "rgba(109,40,217,.16)" : "rgba(109,40,217,.06)";
+  const bands = epochs.map((ep, i) => {
+    const x0 = ep.start === 0 ? 0 : (x(ep.start - 1) + x(ep.start)) / 2;
+    const x1 = ep.end === n - 1 ? W : (x(ep.end) + x(ep.end + 1)) / 2;
+    const bet = (ledger || []).find(b => b.commit === ep.sha);
+    const mark = bet ? (bet.verdict ? (bet.verdict.call === "keep" ? "✓" : "✗") : "?") : "";
+    return `<g class="ver" data-sha="${esc(ep.sha)}">
+      <rect x="${x0}" y="0" width="${x1 - x0}" height="${H}" fill="${bandColor(i)}"/>
+      <text x="${(x0 + x1) / 2}" y="12" text-anchor="middle">v${i + 1}${mark ? " " + mark : ""}</text></g>`;
+  }).join("");
+
+  const pts = fb.map((e, i) => `${x(i)},${y(e.payload.rating)}`).join(" ");
+  const dots = fb.map((e, i) =>
+    `<circle cx="${x(i)}" cy="${y(e.payload.rating)}" r="3.5"
+       fill="${e.payload.rating >= 4 ? "var(--hot)" : e.payload.rating <= 2 ? "var(--red)" : "var(--fg)"}">
+       <title>${esc("rated " + e.payload.rating + ": " + e.payload.raw)}</title></circle>`).join("");
+  const gridlines = [1,2,3,4,5].map(r =>
+    `<line x1="${PAD}" x2="${W-PAD}" y1="${y(r)}" y2="${y(r)}" stroke="rgba(109,40,217,.25)"/>
+     <text x="6" y="${y(r)+3}">${r}</text>`).join("");
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%">
+    ${bands}${gridlines}
+    <polyline points="${pts}" fill="none" stroke="var(--fg)" stroke-width="1.5"/>
+    ${dots}</svg>`;
 }
 
 async function main() {
-  const { events, versions, ledger } = await (await fetch("/api/data")).json();
-  const allFb = events.filter(e => e.kind === "feedback");
-  const fb = allFb.filter(e => e.payload.rating);
+  const { events, versions, ledger, state } = await (await fetch("/api/data")).json();
+  const fb = events.filter(e => e.kind === "feedback" && e.payload.rating);
 
-  // one row per persona version, in order, in words
-  const lanes = [];
-  for (const e of fb) {
-    const last = lanes[lanes.length - 1];
-    if (last && last.sha === e.personaSha) last.fb.push(e);
-    else lanes.push({ sha: e.personaSha, fb: [e] });
-  }
-  const subjectOf = (sha) => (versions.find((v) => v.sha === sha)?.subject ?? "");
-  const color = (r) => r >= 4 ? "var(--hot)" : r <= 2 ? "var(--red)" : "var(--fg)";
-  let prevAvg = null;
-  document.getElementById("spark").innerHTML = lanes.map((l, i) => {
-    const avg = l.fb.reduce((s, e) => s + e.payload.rating, 0) / l.fb.length;
-    const subj = subjectOf(l.sha);
-    const daemon = subj.startsWith("[daemon]");
-    const label = daemon ? `daemon's bet: “${subj.replace("[daemon] ", "").split(".")[0]}”` : (subj || "persona " + l.sha);
-    const scores = l.fb.map(e =>
-      `<span style="color:${color(e.payload.rating)}" title="${esc(e.payload.raw)}">${e.payload.rating}</span>`).join(" ");
-    const trend = prevAvg === null ? "" : avg > prevAvg ? ` · up from ${prevAvg.toFixed(1)}` : avg < prevAvg ? ` · down from ${prevAvg.toFixed(1)}` : " · flat";
-    const b = (ledger || []).find((b) => b.commit === l.sha);
-    const verdict = !b ? "" : !b.verdict ? " · still on trial" : b.verdict.call === "keep" ? " · survived" : " · reverted";
-    prevAvg = avg;
-    return `<div class="ver" data-sha="${esc(l.sha)}" style="margin:10px 0">
-      <div>v${i + 1} · ${esc(label).slice(0, 110)}</div>
-      <div class="sub">you rated it ${scores}<span class="sub"> → avg ${avg.toFixed(1)}${trend}${verdict}</span></div>
-    </div>`;
-  }).join("") || "no rated feedback yet";
-  document.getElementById("sparkmeta").textContent =
-    "hover a number for what you said · click a version for its diff";
+  document.getElementById("arc").innerHTML = arcSvg(fb, versions, ledger);
+  document.getElementById("arcmeta").textContent =
+    "each dot = one of your ratings, in order · bands = persona versions · ✓ bet survived · ✗ reverted · ? on trial · hover dots, click bands";
 
-  // daemon ledger
-  document.getElementById("ledger").innerHTML = (ledger||[]).slice().reverse().map(b => {
-    const v = b.verdict;
-    const tag = !v ? `<span class="delta">open</span>`
-      : v.call === "keep" ? `<span style="color:var(--fg)">keep · ${v.reason}</span>`
-      : `<span class="rogue">reverted · ${v.reason}</span>`;
-    return `<div class="row ver" data-sha="${esc(b.commit)}"><span class="k">${esc(b.commit)}</span>${esc(b.hypothesis)} ${tag}</div>`;
-  }).join("") || "<span class='k'>no bets yet — daemon wakes on 3 fresh feedback events</span>";
+  // relationship state
+  const s = state || {};
+  document.getElementById("state").innerHTML =
+    (s.opinionsOfUser || []).map(o =>
+      `<div class="quote">“${esc(o.opinion)}”<span class="sub"> · confidence ${o.confidence ?? "?"}</span></div>`).join("") +
+    (s.openDisagreements || []).map(d =>
+      `<div class="fight"><span class="sub">open fight · ${esc(d.topic || "")}</span><br>${esc(d.myPosition || "")}</div>`).join("") +
+    (s.runningTension ? `<div class="sub" style="margin-top:6px">tension: ${esc(s.runningTension)}</div>` : "") ||
+    "<span class='sub'>it has no opinion of you yet</span>";
+
+  // daemon record: W-L header + betting slips
+  const bets = (ledger || []).slice().reverse();
+  const w = bets.filter(b => b.verdict?.call === "keep").length;
+  const l = bets.filter(b => b.verdict?.call === "revert").length;
+  const open = bets.length - w - l;
+  const chip = b => !b.verdict ? `<span class="chip open">on trial</span>`
+    : b.verdict.call === "keep" ? `<span class="chip keep">survived · ${esc(b.verdict.reason)}</span>`
+    : `<span class="chip revert">reverted · ${esc(b.verdict.reason)}</span>`;
+  document.getElementById("ledger").innerHTML =
+    `<div style="margin-bottom:8px">record: ${w}–${l}${open ? ` · ${open} on trial` : ""}</div>` +
+    bets.map(b => `<div class="slip" data-slip>
+       <span class="ver" data-sha="${esc(b.commit)}">${esc(b.commit)}</span> ·
+       ${esc(String(b.hypothesis).split(/(?<=\.)\s/).slice(-2, -1)[0] || String(b.hypothesis).split(".")[0])}
+       <span class="sub">· predicts ${esc(b.predicted || "?")}</span>${chip(b)}
+       <div class="full">${esc(b.hypothesis)}</div></div>`).join("") ||
+    "<span class='sub'>no bets yet — the daemon wakes on 3 fresh feedback events</span>";
+
   document.body.addEventListener("click", (ev) => {
-    const el = ev.target.closest("[data-sha]");
-    if (el) showDiff(el.dataset.sha);
+    const sha = ev.target.closest("[data-sha]");
+    if (sha) return showDiff(sha.dataset.sha);
+    const slip = ev.target.closest("[data-slip]");
+    if (slip) slip.classList.toggle("expanded");
   });
 }
 main();
