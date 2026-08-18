@@ -1,81 +1,102 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>ai-lover ❦</title>
+<title>ai-lover ✞</title>
 <style>
-  :root { --bg:#0a0c0a; --fg:#33ff66; --dim:#1d7a3a; --amber:#ffb000; --red:#ff4d4d; --panel:#0e120e; }
+  :root { --bg:#0b0910; --fg:#c084fc; --dim:#6d28d9; --hot:#e879f9; --red:#ff4d6d; --panel:#120e1a; }
   * { box-sizing:border-box; }
   body { background:var(--bg); color:var(--fg); font:13px/1.5 "IBM Plex Mono","Menlo",monospace;
          margin:0; padding:24px; }
   body::after { content:""; pointer-events:none; position:fixed; inset:0;
     background:repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,.18) 2px 4px); }
-  h1 { font-size:14px; font-weight:normal; letter-spacing:.2em; margin:0 0 4px; }
-  h1 b { color:var(--amber); }
-  .sub { color:var(--dim); margin-bottom:20px; }
+  h1 { font-size:14px; font-weight:normal; letter-spacing:.2em; margin:0 0 20px; }
+  h1 b { color:var(--hot); }
+  .sub { color:var(--dim); }
   .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
   .panel { background:var(--panel); border:1px solid var(--dim); padding:12px 14px; }
-  .panel h2 { font-size:12px; font-weight:normal; color:var(--amber); margin:0 0 10px;
+  .panel h2 { font-size:12px; font-weight:normal; color:var(--hot); margin:0 0 10px;
               text-transform:uppercase; letter-spacing:.15em; }
   .panel h2::before { content:"▚ "; color:var(--dim); }
   .bar { display:inline-block; background:var(--fg); height:9px; vertical-align:middle; }
+  .bad .bar { background:var(--red); }
   .row { display:flex; gap:8px; align-items:center; margin:2px 0; }
   .k { color:var(--dim); min-width:110px; }
+  .delta { color:var(--hot); margin-left:6px; }
   .rogue { color:var(--red); }
   .ver { cursor:pointer; }
-  .ver:hover { color:var(--amber); }
+  .ver:hover { color:var(--hot); }
   #spark { letter-spacing:2px; font-size:16px; }
   pre { color:var(--fg); white-space:pre-wrap; max-height:320px; overflow:auto;
         border-top:1px dashed var(--dim); margin-top:8px; padding-top:8px; }
   .wide { grid-column: 1 / -1; }
-  .stars { color:var(--dim); text-align:right; }
 </style>
-<h1>ai-lover <b>❦</b> persona telemetry</h1>
-<div class="sub">objective: love↑ cringe↓ sycophancy↓ tension↑ convincingness↑ · human signal only</div>
+<h1>ai-lover <b>✞</b> persona telemetry</h1>
 <div class="grid">
   <div class="panel"><h2>rating over time</h2><div id="spark"></div><div id="sparkmeta" class="sub"></div></div>
-  <div class="panel"><h2>tag frequency</h2><div id="tags"></div></div>
+  <div class="panel"><h2>signal · what hurts / what lands</h2><div id="tags"></div></div>
   <div class="panel"><h2>per model · avg rating / turns</h2><div id="models"></div></div>
   <div class="panel"><h2>persona versions (click → diff)</h2><div id="versions"></div></div>
-  <div class="panel wide"><h2>diff</h2><pre id="diff">select a version ⋆˚⊹</pre></div>
+  <div class="panel wide"><h2>diff</h2><pre id="diff">select a version</pre></div>
 </div>
-<div class="stars">✧ ⋆ ˚ ⊹ ✧</div>
 <script>
 const SPARK = "▁▂▃▄▅▆▇█";
+const BAD = ["cringe","sycophant","jargon","verbose","hedging","apologetic","lecturing","robotic","flat","hated-it"];
+const esc = s => s.replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";");
+
 async function main() {
   const { events, versions } = await (await fetch("/api/data")).json();
-  const fb = events.filter(e => e.kind === "feedback" && e.payload.rating);
+  const allFb = events.filter(e => e.kind === "feedback");
+  const fb = allFb.filter(e => e.payload.rating);
 
   // rating sparkline, colored by persona sha boundaries
   const shas = [...new Set(fb.map(e => e.personaSha))];
   document.getElementById("spark").innerHTML = fb.map(e => {
-    const c = shas.indexOf(e.personaSha) % 2 ? "var(--amber)" : "var(--fg)";
-    return `<span style="color:${c}" title="${e.personaSha} t${e.turn}: ${e.payload.raw}">${SPARK[Math.round((e.payload.rating-1)/4*7)]}</span>`;
+    const c = shas.indexOf(e.personaSha) % 2 ? "var(--hot)" : "var(--fg)";
+    return `<span style="color:${c}" title="${esc(e.personaSha + " t" + e.turn + ": " + e.payload.raw)}">${SPARK[Math.round((e.payload.rating-1)/4*7)]}</span>`;
   }).join("") || "no rated feedback yet";
   document.getElementById("sparkmeta").textContent =
-    fb.length + " rated events · alternating color = persona version change";
+    fb.length + " rated events · color alternates on persona version change · hover for the words";
 
-  // tags
-  const tags = {};
-  events.filter(e => e.kind === "feedback").forEach(e => (e.payload.tags||[]).forEach(t => tags[t]=(tags[t]||0)+1));
-  const tmax = Math.max(1, ...Object.values(tags));
-  document.getElementById("tags").innerHTML = Object.entries(tags).sort((a,b)=>b[1]-a[1])
-    .map(([t,n]) => `<div class="row"><span class="k">${t}</span><span class="bar" style="width:${n/tmax*160}px"></span> ${n}</div>`)
-    .join("") || "<span class='k'>none yet</span>";
+  // tags: hurts vs lands, with recent-vs-overall trend (last 10 feedback events)
+  const recent = allFb.slice(-10);
+  const count = (list) => {
+    const m = {};
+    list.forEach(e => (e.payload.tags||[]).forEach(t => m[t]=(m[t]||0)+1));
+    return m;
+  };
+  const all = count(allFb), rec = count(recent);
+  const tmax = Math.max(1, ...Object.values(all));
+  const rows = (keys, cls) => keys
+    .filter(t => all[t]).sort((a,b)=>all[b]-all[a])
+    .map(t => {
+      const r = rec[t]||0;
+      const trend = r === 0 ? "quiet lately" : r + " of last " + recent.length;
+      return `<div class="row ${cls}"><span class="k">${t}</span><span class="bar" style="width:${all[t]/tmax*140}px"></span> ${all[t]}<span class="delta">${trend}</span></div>`;
+    }).join("");
+  const hurts = rows(BAD, "bad");
+  const lands = rows(Object.keys(all).filter(t => !BAD.includes(t)), "");
+  document.getElementById("tags").innerHTML =
+    (hurts ? `<div class="sub">hurts</div>${hurts}` : "") +
+    (lands ? `<div class="sub" style="margin-top:8px">lands</div>${lands}` : "") ||
+    "<span class='k'>no tagged feedback yet — use the tag words in your feedback text</span>";
 
   // per model, normalized by turns
   const byModel = {};
   fb.forEach(e => { const m = e.model||"?"; (byModel[m] ||= {sum:0,n:0,turns:new Set()});
     byModel[m].sum += e.payload.rating; byModel[m].n++; byModel[m].turns.add(e.session+":"+e.turn); });
   document.getElementById("models").innerHTML = Object.entries(byModel)
-    .map(([m,v]) => `<div class="row"><span class="k">${m.split("/").pop()}</span>${(v.sum/v.n).toFixed(2)} avg · ${v.turns.size} turns</div>`)
+    .map(([m,v]) => `<div class="row"><span class="k">${esc(m.split("/").pop())}</span>${(v.sum/v.n).toFixed(2)} avg · ${v.turns.size} turns</div>`)
     .join("") || "<span class='k'>none yet</span>";
 
-  // versions
+  // versions — event delegation, no inline handlers
   document.getElementById("versions").innerHTML = versions.map(v =>
-    `<div class="row ver ${v.rogue?"rogue":""}" onclick="showDiff('${v.sha}')">
-       <span class="k">${v.sha}</span>${v.subject}</div>`).join("");
-}
-async function showDiff(sha) {
-  document.getElementById("diff").textContent = await (await fetch("/api/diff?sha="+sha)).text();
+    `<div class="row ver ${v.rogue?"rogue":""}" data-sha="${esc(v.sha)}">
+       <span class="k">${esc(v.sha)}</span>${esc(v.subject)}</div>`).join("");
+  document.getElementById("versions").addEventListener("click", async (ev) => {
+    const el = ev.target.closest("[data-sha]");
+    if (!el) return;
+    const r = await fetch("/api/diff?sha=" + encodeURIComponent(el.dataset.sha));
+    document.getElementById("diff").textContent = r.ok ? await r.text() : "diff failed: " + r.status;
+  });
 }
 main();
 </script>

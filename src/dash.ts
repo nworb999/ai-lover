@@ -21,8 +21,10 @@ function personaLog() {
 }
 
 function personaDiff(sha: string): string {
+  if (!/^[0-9a-f]{4,40}$/i.test(sha)) return "bad sha";
   try {
-    return execSync(`git show ${sha} -- persona/`, { cwd: ROOT, maxBuffer: 1e7 }).toString();
+    const out = execSync(`git show ${sha} -- persona/`, { cwd: ROOT, maxBuffer: 1e7 }).toString();
+    return out.trim() || execSync(`git show ${sha}`, { cwd: ROOT, maxBuffer: 1e7 }).toString();
   } catch {
     return "no diff";
   }
